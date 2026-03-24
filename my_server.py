@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import os
-import asyncio
 from fastmcp import FastMCP
 import subprocess
 import sys
