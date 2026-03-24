@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 import os
+import asyncio
 from fastmcp import FastMCP
+import subprocess
+import sys
 
 mcp = FastMCP("TopologyTalk")
 
@@ -18,14 +21,15 @@ def get_server_info() -> dict:
     }
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8000))
-    host = "0.0.0.0"
-    
-    print(f"Starting FastMCP server on {host}:{port}")
-    
-    mcp.run(
-        transport="http",
-        host=host,
-        port=port,
-        stateless_http=True
-    )
+  port = int(os.environ.get("PORT", 8000))
+  host = "localhost"
+
+  subprocess.Popen([sys.executable, "run_tunnel.py"])
+
+  print(f"Starting FastMCP server on {host}:{port}")  
+  mcp.run(
+    transport="http",
+    host=host,
+    port=port,
+    stateless_http=True
+  )
