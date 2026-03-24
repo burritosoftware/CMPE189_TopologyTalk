@@ -5,8 +5,14 @@ import subprocess
 import sys
 import requests
 import json
+from dotenv import load_dotenv
 
 mcp = FastMCP("TopologyTalk")
+
+load_dotenv()
+RYU_OFCTL_REST_URL = os.getenv("RYU_OFCTL_REST_URL")
+MCP_HOST = os.getenv("MCP_HOST")
+MCP_PORT = int(os.getenv("MCP_PORT"))
 
 ## MCP Tools
 @mcp.tool(description="Greet a user by name with a welcome message from the MCP server")
@@ -22,7 +28,7 @@ def get_server_info() -> dict:
         "python_version": os.sys.version.split()[0]
     }
 
-@mcp.tool()
+@mcp.tool(description="")
 def get_network_topology() -> str:
     """
     Fetches the current network topology, including all switches and links 
@@ -54,12 +60,12 @@ if __name__ == "__main__":
   port = int(os.environ.get("PORT", 8000))
   host = "localhost"
 
-  subprocess.Popen([sys.executable, "run_tunnel.py"])
+  subprocess.Popen([sys.executable, "run_tunnel.py", "--host", MCP_HOST, "--port", str(MCP_PORT)])
 
-  print(f"Starting FastMCP server on {host}:{port}")  
+  print(f"Starting FastMCP server on {MCP_HOST}:{MCP_PORT}")
   mcp.run(
     transport="http",
-    host=host,
-    port=port,
+    host=MCP_HOST,
+    port=MCP_PORT,
     stateless_http=True
   )

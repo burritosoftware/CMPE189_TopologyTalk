@@ -3,3 +3,4 @@ fastmcp==3.1.1
 httpx
 websockets
 requests
+python-dotenv

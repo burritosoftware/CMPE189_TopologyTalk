@@ -16,7 +16,11 @@ git clone https://github.com/burritosoftware/CMPE189_TopologyTalk.git
 ```
 pip install -r requirements.txt
 ```
-4. Run the server.
+4. Copy .env.example to .env and configure as necessary.
+```bash
+cp .env.example .env
+```
+5. Run the server.
 ```
 python my_server.py
 ```

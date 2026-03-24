@@ -1,13 +1,16 @@
 import asyncio
+import argparse
 from poketunnel import login, PokeTunnel, TunnelOptions
 
-async def main():
+async def main(host: str, port: int):
     result = await login()
     print("Logged in:", result.token[:10], "...")
 
+    url = f"http://{host}:{port}/mcp"
+
     tunnel = PokeTunnel(
         TunnelOptions(
-            url="http://localhost:8000/mcp",
+            url=url,
             name="TopologyTalk Dev",
         )
     )
@@ -26,4 +29,12 @@ async def main():
     finally:
         await tunnel.stop()
 
-asyncio.run(main())
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run PokeTunnel")
+    parser.add_argument("--host", default="localhost", help="Host (default: localhost)")
+    parser.add_argument("--port", type=int, default=8000, help="Port (default: 8000)")
+
+    args = parser.parse_args()
+
+    asyncio.run(main(args.host, args.port))
