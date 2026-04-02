@@ -25,12 +25,14 @@ class ToolCallVerification(BaseModel):
     recommended_action: str = Field(description="Recommended next step if not valid")
 
 # PydanticAI Agent for checking tool calls
-# Note: Ensure an appropriate LLM provider (e.g. OpenAI) API key is set in environment.
+# TODO: Obtain an appropriate LLM provider (e.g. OpenAI) API key and set in .env. Probably make a better prompt as well.
 checker_agent = Agent(
     'openai:gpt-4o', 
     result_type=ToolCallVerification,
     system_prompt="You are a network security auditor for an SDN controller. Your job is to verify tool calls intended for the network."
-) ## MCP Tools
+)
+
+## MCP Tools
 @mcp.tool(description="Verify if a tool call to the network is safe and valid using PydanticAI")
 async def verify_tool_call(tool_name: str, arguments: dict) -> dict:
     """
