@@ -7,14 +7,43 @@ import requests
 import json
 from dotenv import load_dotenv
 
+from pydantic import BaseModel, Field
+from pydantic_ai import Agent, RunContext
+
 mcp = FastMCP("TopologyTalk")
 
 load_dotenv()
 RYU_OFCTL_REST_URL = os.getenv("RYU_OFCTL_REST_URL")
+RYU_API_VERSION = os.getenv("RYU_API_VERSION", "v1.0")
 MCP_HOST = os.getenv("MCP_HOST")
 MCP_PORT = int(os.getenv("MCP_PORT"))
 
-## MCP Tools
+# Pydantic Model for tool call verification
+class ToolCallVerification(BaseModel):
+    is_valid: bool = Field(description="Whether the tool call is valid and safe")
+    reason: str = Field(description="The reason for the validation result")
+    recommended_action: str = Field(description="Recommended next step if not valid")
+
+# PydanticAI Agent for checking tool calls
+# Note: Ensure an appropriate LLM provider (e.g. OpenAI) API key is set in environment.
+checker_agent = Agent(
+    'openai:gpt-4o', 
+    result_type=ToolCallVerification,
+    system_prompt="You are a network security auditor for an SDN controller. Your job is to verify tool calls intended for the network."
+) ## MCP Tools
+@mcp.tool(description="Verify if a tool call to the network is safe and valid using PydanticAI")
+async def verify_tool_call(tool_name: str, arguments: dict) -> dict:
+    """
+    Uses PydanticAI to audit a tool call before it's executed against the network.
+    """
+    try:
+        result = await checker_agent.run(
+            f"Audit the following tool call: Tool={tool_name}, Arguments={json.dumps(arguments)}"
+        )
+        return result.data.model_dump()
+    except Exception as e:
+        return {"is_valid": False, "reason": f"Verification error: {str(e)}", "recommended_action": "Retry or manual check"}
+
 @mcp.tool(description="Greet a user by name with a welcome message from the MCP server")
 def greet(name: str) -> str:
     return f"Hello, {name}! Welcome to our sample MCP server!"
@@ -34,7 +63,7 @@ def get_network_topology() -> str:
     Fetches the current network topology, including all switches and links 
     discovered by the Ryu controller.
     """
-    BASE_URL = "http://localhost:8080/v1.0/topology"
+    BASE_URL = f"{RYU_OFCTL_REST_URL}/{RYU_API_VERSION}/topology"
     
     try:
         # Get switches and links from Ryu's topology REST API

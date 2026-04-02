@@ -1,4 +1,4 @@
-from ryu.app import simple_switch_13  # Import the "brain"
+from ryu.app import simple_switch_13
 from ryu.topology import event
 from ryu.controller.handler import set_ev_cls
 
