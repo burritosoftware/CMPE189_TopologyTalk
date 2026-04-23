@@ -12,8 +12,10 @@ Texting-Driven SDN Quality of Service Control (with Poke/MCP)
 ```bash
 git clone https://github.com/burritosoftware/CMPE189_TopologyTalk.git
 ```
-3. Install dependencies.
+3. Install dependencies (venv recommended).
 ```
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 4. Copy .env.example to .env and configure as necessary.
@@ -25,3 +27,11 @@ cp .env.example .env
 python my_server.py
 ```
 You will be asked to login to Poke in the browser if it's your first time.
+
+6. Install ryu-manager and test installation (e.g. on a mininet topology)
+This assumes you have some mininet topology instantiated for the ryu-manager to connect to
+```bash
+cd ryu
+pip install .
+ryu-manager --observe-links network_logic/test.py ryu.app.rest_topology
+```
