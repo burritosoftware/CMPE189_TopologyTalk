@@ -1105,11 +1105,16 @@ class Match(object):
                     continue
             elif value == 0:
                 continue
-
+            
             if key in Match._CONVERT:
                 conv = Match._CONVERT[key]
                 conv = dict((value, key) for key, value in conv.items())
-                match.setdefault(key, conv[value])
+
+                if value in conv:
+                    match.setdefault(key, conv[value])
+                else:
+                    match.setdefault(key, value)
+            
             else:
                 match.setdefault(key, value)
 
