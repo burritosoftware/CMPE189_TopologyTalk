@@ -38,14 +38,15 @@ cd ..
 ./run_ryu.sh
 ```
 
-7. In yet another terminal, run the test topology for the controller to connect to.
-An example topology for testing and demoing is provided. For example, if running the controller on the same machine on the default port, set "ip=127.0.0.1,port=6633". E.g.:
+7. Connect the controller to the topology you wish to interact with.
+An example topology in mininet for testing and demoing is provided. For example, if running the controller on the same machine on the default port, set "ip=127.0.0.1,port=6633". E.g.:
 ```bash
 sudo mn --topo linear,3 --mac \
   --controller=remote,ip=127.0.0.1,port=6633 \
   --switch ovsk,protocols=OpenFlow13
 ```
-Note: Ensure the controller is connected by either checking the controller's log for some confirmation, e.g:
+Note: Ensure the controller is connected to the topology by checking the controller's log for some confirmation, e.g:
+
 [QoS][INFO] dpid=0000000000000001: Join qos switch.
 
 8. Done! Simply talk to Poke and manage and query a network topology with natural language!
