@@ -28,10 +28,24 @@ python my_server.py
 ```
 You will be asked to login to Poke in the browser if it's your first time.
 
-6. Install ryu-manager and test installation (e.g. on a mininet topology)
-This assumes you have some mininet topology instantiated for the ryu-manager to connect to
+6. In another terminal, install ryu-manager and run the controller. If you already have a working ryu installation, you may simply run the script:
 ```bash
 cd ryu
+python -m venv .venv
+source .venv/bin/activate
 pip install .
-ryu-manager --observe-links network_logic/test.py ryu.app.rest_topology
+cd ..
+./run_ryu.sh
 ```
+
+7. In yet another terminal, run the test topology for the controller to connect to.
+An example topology for testing and demoing is provided. For example, if running the controller on the same machine on the default port, set "ip=127.0.0.1,port=6633". E.g.:
+```bash
+sudo mn --topo linear,3 --mac \
+  --controller=remote,ip=127.0.0.1,port=6633 \
+  --switch ovsk,protocols=OpenFlow13
+```
+Note: Ensure the controller is connected by either checking the controller's log for some confirmation, e.g:
+[QoS][INFO] dpid=0000000000000001: Join qos switch.
+
+8. Done! Simply talk to Poke and manage and query a network topology with natural language!
