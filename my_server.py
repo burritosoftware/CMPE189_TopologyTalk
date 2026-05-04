@@ -72,6 +72,46 @@ def get_network_topology() -> str:
         return f"Error fetching topology: {str(e)}"
 
 @mcp.tool()
+def bind_ovsdb_bridges(ovsdb_addr: str = "tcp:127.0.0.1:6640") -> str:
+    """
+    Binds every switch DPID discovered by Ryu to the given OVSDB address.
+
+    This fixes Ryu QoS errors like:
+    "ovs_bridge is not exists"
+
+    Requires:
+    - ryu.app.rest_conf_switch loaded
+    - OVSDB listening, usually from:
+      sudo ovs-vsctl set-manager ptcp:6640
+    """
+    try:
+        switches = ryu_get("/v1.0/topology/switches")
+
+        results = []
+
+        for switch in switches:
+            dpid = switch["dpid"]
+            path = f"/v1.0/conf/switches/{dpid}/ovsdb_addr"
+
+            # Important: rest_conf_switch expects the body to be a JSON string,
+            # so requests' json=ovsdb_addr is correct.
+            response = ryu_put(path, ovsdb_addr)
+
+            results.append({
+                "dpid": dpid,
+                "ovsdb_addr": ovsdb_addr,
+                "result": response,
+            })
+
+        return json.dumps({
+            "bound_count": len(results),
+            "bindings": results,
+        }, indent=2)
+
+    except Exception as e:
+        return f"Error binding OVSDB bridges: {str(e)}"
+
+@mcp.tool()
 def get_qos_queues(switch_id: str = "all") -> str:
     """
     Get the current queue configurations for the specified switch.
