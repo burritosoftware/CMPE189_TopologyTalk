@@ -52,4 +52,4 @@ Note: Ensure the controller is connected to the topology by checking the control
 
 [QoS][INFO] dpid=0000000000000001: Join qos switch.
 
-8. Done! Simply talk to Poke and manage and query and manage the QoS of a network topology with natural language!
+8. Done! Simply talk to Poke and manage and query the QoS of a network topology with natural language!
