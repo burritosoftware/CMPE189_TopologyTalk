@@ -1,0 +1,27 @@
+sh sudo ovs-vsctl set bridge s1 protocols=OpenFlow13
+sh sudo ovs-vsctl set bridge s2 protocols=OpenFlow13
+sh sudo ovs-vsctl set bridge s3 protocols=OpenFlow13
+sh sudo ovs-vsctl set bridge s4 protocols=OpenFlow13
+
+sh sudo ovs-vsctl set-controller s1 tcp:127.0.0.1:6633
+sh sudo ovs-vsctl set-controller s2 tcp:127.0.0.1:6633
+sh sudo ovs-vsctl set-controller s3 tcp:127.0.0.1:6633
+sh sudo ovs-vsctl set-controller s4 tcp:127.0.0.1:6633
+
+# Ensure table 0 sends unmatched traffic to table 1
+sh sudo ovs-ofctl -O OpenFlow13 add-flow s1 "table=0,priority=0,actions=goto_table:1"
+sh sudo ovs-ofctl -O OpenFlow13 add-flow s2 "table=0,priority=0,actions=goto_table:1"
+sh sudo ovs-ofctl -O OpenFlow13 add-flow s3 "table=0,priority=0,actions=goto_table:1"
+sh sudo ovs-ofctl -O OpenFlow13 add-flow s4 "table=0,priority=0,actions=goto_table:1"
+
+# Slow path forwarding in table 1: h1 -> s1 -> s2 -> s4 -> h2
+sh sudo ovs-ofctl -O OpenFlow13 add-flow s1 "table=1,priority=100,in_port=1,actions=output:2"
+sh sudo ovs-ofctl -O OpenFlow13 add-flow s1 "table=1,priority=100,in_port=2,actions=output:1"
+
+sh sudo ovs-ofctl -O OpenFlow13 add-flow s2 "table=1,priority=100,in_port=1,actions=output:2"
+sh sudo ovs-ofctl -O OpenFlow13 add-flow s2 "table=1,priority=100,in_port=2,actions=output:1"
+
+sh sudo ovs-ofctl -O OpenFlow13 add-flow s4 "table=1,priority=100,in_port=2,actions=output:1"
+sh sudo ovs-ofctl -O OpenFlow13 add-flow s4 "table=1,priority=100,in_port=1,actions=output:2"
+
+pingall

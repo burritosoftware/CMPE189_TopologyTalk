@@ -52,4 +52,13 @@ Note: Ensure the controller is connected to the topology by checking the control
 
 [QoS][INFO] dpid=0000000000000001: Join qos switch.
 
+<<<<<<< HEAD
 8. Done! Simply talk to Poke and manage and query the QoS of a network topology with natural language!
+=======
+In addition, ensure the slow path is the path initilized. We can exploit link learning for automatic flow rule installation to do it for us! In mininet, run the provided script:
+```bash
+mininet> source slow_path_init.mn
+```
+
+8. Done! Simply talk to Poke and manage and query and manage the QoS of a network topology with natural language!
+>>>>>>> 7e99950 (slimmed down server; fixed test topo and path init)
