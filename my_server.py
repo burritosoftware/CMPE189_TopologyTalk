@@ -35,6 +35,19 @@ def ryu_delete(path, data=None):
     response.raise_for_status()
     return response.json()
 
+def ryu_put(path: str, payload):
+    resp = requests.put(
+        f"{RYU_BASE_URL}{path}",
+        json=payload,
+        timeout=5,
+    )
+    resp.raise_for_status()
+
+    try:
+        return resp.json()
+    except Exception:
+        return resp.text
+
 ## MCP Tools
 
 @mcp.tool(description="Get information about the MCP server")
