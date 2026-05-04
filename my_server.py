@@ -13,6 +13,7 @@ load_dotenv()
 RYU_BASE_URL = os.getenv("RYU_BASE_URL", "http://localhost:8080")
 MCP_HOST = os.getenv("MCP_HOST", "0.0.0.0")
 MCP_PORT = int(os.getenv("MCP_PORT", "8000"))
+OVSDB_ADDR = os.getenv("OVSDB_ADDR", "tcp:127.0.0.1:6640")
 
 mcp = FastMCP("TopologyTalk")
 
@@ -47,6 +48,18 @@ def ryu_put(path: str, payload):
         return resp.json()
     except Exception:
         return resp.text
+
+# Dude this LLM is so stupid with this OVSDB parameter input I have to NORMALIZE it man???? Hello???
+def normalize_ovsdb_addr(value: str) -> str:
+    if value.startswith("ptcp:"):
+        return "tcp:127.0.0.1:" + value.split(":", 1)[1]
+
+    if not value.startswith(("tcp:", "unix:")):
+        raise ValueError(
+            f"Invalid OVSDB_ADDR={value}. Use tcp:127.0.0.1:6640, not ptcp:6640."
+        )
+
+    return value
 
 ## MCP Tools
 
@@ -85,40 +98,38 @@ def get_network_topology() -> str:
         return f"Error fetching topology: {str(e)}"
 
 @mcp.tool()
-def bind_ovsdb_bridges(ovsdb_addr: str = "tcp:127.0.0.1:6640") -> str:
+def bind_ovsdb_bridges() -> str:
     """
-    Binds every switch DPID discovered by Ryu to the given OVSDB address.
+    Bind every Ryu-discovered switch DPID to the configured OVSDB address.
 
-    This fixes Ryu QoS errors like:
-    "ovs_bridge is not exists"
-
-    Requires:
-    - ryu.app.rest_conf_switch loaded
-    - OVSDB listening, usually from:
-      sudo ovs-vsctl set-manager ptcp:6640
+    Uses OVSDB_ADDR from the environment.
+    Example:
+      OVSDB_ADDR=tcp:127.0.0.1:6640
     """
     try:
-        switches = ryu_get("/v1.0/topology/switches")
+        ovsdb_addr = normalize_ovsdb_addr(OVSDB_ADDR)
 
+        switches = ryu_get("/v1.0/topology/switches")
         results = []
 
         for switch in switches:
             dpid = switch["dpid"]
             path = f"/v1.0/conf/switches/{dpid}/ovsdb_addr"
 
-            # Important: rest_conf_switch expects the body to be a JSON string,
-            # so requests' json=ovsdb_addr is correct.
-            response = ryu_put(path, ovsdb_addr)
+            bind_result = ryu_put(path, ovsdb_addr)
+            verify_result = ryu_get(path)
 
             results.append({
                 "dpid": dpid,
-                "ovsdb_addr": ovsdb_addr,
-                "result": response,
+                "ovsdb_addr_sent": ovsdb_addr,
+                "bind_result": bind_result,
+                "verified_ovsdb_addr": verify_result,
             })
 
         return json.dumps({
+            "ovsdb_addr": ovsdb_addr,
             "bound_count": len(results),
-            "bindings": results,
+            "results": results,
         }, indent=2)
 
     except Exception as e:
