@@ -601,10 +601,23 @@ class QoS(object):
         self.ofctl.mod_flow_entry(self.dp, flow, cmd)
 
     def set_ovsdb_addr(self, dpid, ovsdb_addr):
-        old_address = self.ovsdb_addr
-        if old_address == ovsdb_addr:
-            return
-        elif ovsdb_addr is None:
+        self.ovsdb_addr = None
+        self.ovs_bridge = None
+
+        ovs_bridge = bridge.OVSBridge(self.CONF, dpid, ovsdb_addr)
+        try:
+            ovs_bridge.init()
+        except Exception as e:
+            QoSController._LOGGER.exception(
+                "Failed to init OVSBridge dpid=%s ovsdb_addr=%s",
+                dpid, ovsdb_addr
+            )
+            raise ValueError('ovsdb addr is not available: %s' % e)
+
+        self.ovsdb_addr = ovsdb_addr
+        self.ovs_bridge = ovs_bridge
+
+        if ovsdb_addr is None:
             # Determine deleting OVSDB address was requested.
             if self.ovs_bridge:
                 self.ovs_bridge = None
