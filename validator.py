@@ -23,12 +23,10 @@ def get_agent():
             "You are an SDN Safety Validator. Your job is to inspect proposed OpenFlow changes "
             "and ensure they are within safe bounds and match the user's intent. "
             "Safe bounds: \n"
-            "- Only allow basic forwarding or group output actions.\n"
-            "- Do not allow arbitrary actions like SET_FIELD unless they are for safe protocol fields.\n"
+            "- Only allow basic forwarding actions (OUTPUT).\n"
+            "- Do not allow arbitrary actions like SET_FIELD.\n"
             "- Match fields must be restricted to: in_port, eth_src, eth_dst, ipv4_src, ipv4_dst, eth_type.\n"
-            "- Priority should be between 0 and 65535.\n"
-            "- Ensure group buckets only contain output actions to ports.\n"
-            "- Ensure fast-failover groups have valid watch ports."
+            "- Priority should be between 0 and 65535."
         ),
     )
 
@@ -38,13 +36,6 @@ async def validate_sdn_request(intent: str, request: Any) -> ValidationResult:
     """
     agent = get_agent()
     if not agent:
-        # Simple rule-based fallback
-        if hasattr(request, 'match'):
-            m = request.match
-            # Example rule: check if any fields outside allowed set are used
-            # But Pydantic models already constrain this.
-            pass
-        
         return ValidationResult(
             is_safe=True,
             reason="Validated by rule-based fallback (No API key found)"

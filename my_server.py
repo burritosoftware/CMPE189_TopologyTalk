@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 TopologyTalk Constrained MCP Server.
-Implements specific flow and group management tools with validation and logging.
+Implements specific flow management tools with validation and logging.
 """
 
 from __future__ import annotations
@@ -17,9 +17,8 @@ from dotenv import load_dotenv
 from fastmcp import FastMCP
 
 from models import (
-    ForwardingFlowRequest, FlowMatch, SelectGroupRequest, 
-    FastFailoverGroupRequest, FlowToGroupRequest, 
-    DeleteFlowRequest, DeleteGroupRequest
+    ForwardingFlowRequest, FlowMatch, 
+    DeleteFlowRequest
 )
 from validator import validate_sdn_request
 
@@ -30,7 +29,6 @@ MCP_HOST = os.getenv("MCP_HOST", "0.0.0.0")
 MCP_PORT = int(os.getenv("MCP_PORT", "8000"))
 
 # Dedicated cookie for LLM-installed flows: "llm" in hex prefix
-# Use in combination with group IDs > 10000 to identify LLM installations
 LLM_COOKIE = 0x6c6c6d0000000000
 LLM_COOKIE_MASK = 0xffffff0000000000
 
@@ -187,34 +185,8 @@ async def get_queue_stats(switch_id: str) -> str:
     except Exception as e:
         return f"Queue stats unavailable or error: {str(e)}"
 
-@mcp.tool()
-async def get_groups(switch_id: str) -> str:
-    """Return group table entries (buckets, types) for one switch."""
-    _log_tool_call("get_groups", {"switch_id": switch_id})
-    try:
-        dpid = _dpid_to_int(switch_id)
-        groups = _request("GET", f"/stats/groupdesc/{dpid}")
-        if not groups or str(dpid) not in groups:
-            return f"No groups found on {switch_id}"
-        return _json(groups[str(dpid)])
-    except Exception as e:
-        return f"Error fetching groups: {str(e)}"
-
-@mcp.tool()
-async def get_group_stats(switch_id: str) -> str:
-    """Return group stats (packet/byte counts) for one switch."""
-    _log_tool_call("get_group_stats", {"switch_id": switch_id})
-    try:
-        dpid = _dpid_to_int(switch_id)
-        stats = _request("GET", f"/stats/group/{dpid}")
-        if not stats or str(dpid) not in stats:
-            return f"Group stats unavailable or none found on {switch_id}"
-        return _json(stats[str(dpid)])
-    except Exception as e:
-        return f"Group stats unavailable or error: {str(e)}"
-
 # -----------------------------------------------------------------------------
-# Phase 1: Flow Tools
+# Flow Tools
 # -----------------------------------------------------------------------------
 
 @mcp.tool()
@@ -269,124 +241,6 @@ async def clear_llm_installed_flows(switch_id: str) -> str:
     }
     _request("POST", "/stats/flowentry/delete", json=flow_to_del)
     return f"Cleared all LLM-installed flows on {switch_id}"
-
-# -----------------------------------------------------------------------------
-# Phase 2: Group Tools
-# -----------------------------------------------------------------------------
-
-@mcp.tool()
-async def install_select_group(switch_id: str, group_id: int, buckets: List[Dict[str, Any]]) -> str:
-    """Install a SELECT group for load balancing."""
-    _log_tool_call("install_select_group", {"switch_id": switch_id, "group_id": group_id, "buckets": buckets})
-    
-    # LLM group IDs must be in 100000+ range
-    if group_id < 100000:
-        return "Error: Group ID must be >= 100000 for LLM-installed groups."
-
-    req = SelectGroupRequest(switch_id=switch_id, group_id=group_id, buckets=[])
-    # Basic bucket validation logic should be here or in validator
-    for b in buckets:
-        req.buckets.append(b)
-
-    val = await validate_sdn_request("Install select group", req)
-    if not val.is_safe:
-        return f"Validation Failed: {val.reason}"
-
-    dpid = _dpid_to_int(switch_id)
-    group = {
-        "dpid": dpid,
-        "type": "SELECT",
-        "group_id": group_id,
-        "buckets": buckets
-    }
-    _request("POST", "/stats/groupentry/add", json=group)
-    return f"Select Group {group_id} installed on {switch_id}"
-
-@mcp.tool()
-async def install_fast_failover_group(switch_id: str, group_id: int, buckets: List[Dict[str, Any]]) -> str:
-    """Install a FAST_FAILOVER group."""
-    _log_tool_call("install_fast_failover_group", {"switch_id": switch_id, "group_id": group_id, "buckets": buckets})
-    
-    if group_id < 100000:
-        return "Error: Group ID must be >= 100000 for LLM-installed groups."
-
-    req = FastFailoverGroupRequest(switch_id=switch_id, group_id=group_id, buckets=[])
-    for b in buckets:
-        req.buckets.append(b)
-
-    val = await validate_sdn_request("Install fast failover group", req)
-    if not val.is_safe:
-        return f"Validation Failed: {val.reason}"
-
-    dpid = _dpid_to_int(switch_id)
-    group = {
-        "dpid": dpid,
-        "type": "FF",
-        "group_id": group_id,
-        "buckets": buckets
-    }
-    _request("POST", "/stats/groupentry/add", json=group)
-    return f"Fast Failover Group {group_id} installed on {switch_id}"
-
-@mcp.tool()
-async def install_flow_to_group(switch_id: str, match: Dict[str, Any], group_id: int, priority: int = 100) -> str:
-    """Install a flow that redirects traffic to a group."""
-    _log_tool_call("install_flow_to_group", {"switch_id": switch_id, "match": match, "group_id": group_id, "priority": priority})
-    
-    if group_id < 100000:
-        return "Rejected: Only LLM-managed groups (ID >= 100000) can be used."
-
-    req = FlowToGroupRequest(switch_id=switch_id, match=FlowMatch(**match), group_id=group_id, priority=priority)
-    val = await validate_sdn_request("Install flow to group", req)
-    if not val.is_safe:
-        return f"Validation Failed: {val.reason}"
-
-    dpid = _dpid_to_int(switch_id)
-    flow = {
-        "dpid": dpid,
-        "cookie": LLM_COOKIE,
-        "priority": priority,
-        "match": req.match.model_dump(exclude_none=True),
-        "actions": [{"type": "GROUP", "group_id": group_id}]
-    }
-    _request("POST", "/stats/flowentry/add", json=flow)
-    return f"Flow to Group {group_id} installed on {switch_id}"
-
-@mcp.tool()
-async def delete_group(switch_id: str, group_id: int) -> str:
-    """Delete an LLM-installed group."""
-    _log_tool_call("delete_group", {"switch_id": switch_id, "group_id": group_id})
-    
-    if group_id < 100000:
-        return "Rejected: Cannot delete non-LLM groups via this tool."
-
-    dpid = _dpid_to_int(switch_id)
-    group = {
-        "dpid": dpid,
-        "group_id": group_id
-    }
-    _request("POST", "/stats/groupentry/delete", json=group)
-    return f"Deleted group {group_id} on {switch_id}"
-
-@mcp.tool()
-async def clear_llm_installed_groups(switch_id: str) -> str:
-    """Clear all LLM-installed groups (heuristically based on range)."""
-    _log_tool_call("clear_llm_installed_groups", {"switch_id": switch_id})
-    dpid = _dpid_to_int(switch_id)
-    
-    # We must fetch all groups first to know which ones to delete
-    groups = _request("GET", f"/stats/groupdesc/{dpid}")
-    if not groups or str(dpid) not in groups:
-        return f"No groups found on {switch_id}"
-    
-    count = 0
-    for g in groups[str(dpid)]:
-        gid = int(g.get("group_id", 0))
-        if gid >= 100000:
-            _request("POST", "/stats/groupentry/delete", json={"dpid": dpid, "group_id": gid})
-            count += 1
-            
-    return f"Cleared {count} LLM-managed groups on {switch_id}"
 
 # -----------------------------------------------------------------------------
 # Entrypoint

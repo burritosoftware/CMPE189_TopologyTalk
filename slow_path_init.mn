@@ -1,22 +1,54 @@
-sh sudo ovs-vsctl set bridge s1 protocols=OpenFlow13
-sh sudo ovs-vsctl set bridge s2 protocols=OpenFlow13
-sh sudo ovs-vsctl set bridge s3 protocols=OpenFlow13
-sh sudo ovs-vsctl set bridge s4 protocols=OpenFlow13
+# Clean diamond topology baseline: both branches installed both directions.
 
-sh sudo ovs-vsctl set-controller s1 tcp:127.0.0.1:6633
-sh sudo ovs-vsctl set-controller s2 tcp:127.0.0.1:6633
-sh sudo ovs-vsctl set-controller s3 tcp:127.0.0.1:6633
-sh sudo ovs-vsctl set-controller s4 tcp:127.0.0.1:6633
+# Clear old flows and groups
+sh sudo ovs-ofctl -O OpenFlow13 del-flows s1
+sh sudo ovs-ofctl -O OpenFlow13 del-flows s2
+sh sudo ovs-ofctl -O OpenFlow13 del-flows s3
+sh sudo ovs-ofctl -O OpenFlow13 del-flows s4
 
-# Slow path forwarding in table 0: h1 -> s1 -> s2 -> s4 -> h2
-# We use priority 100 to override the default simple_switch_13 flows (priority 1)
+sh sudo ovs-ofctl -O OpenFlow13 del-groups s1
+sh sudo ovs-ofctl -O OpenFlow13 del-groups s2
+sh sudo ovs-ofctl -O OpenFlow13 del-groups s3
+sh sudo ovs-ofctl -O OpenFlow13 del-groups s4
+
+# Keep LLDP packets going to controller for Ryu topology discovery
+sh sudo ovs-ofctl -O OpenFlow13 add-flow s1 "table=0,priority=65535,dl_dst=01:80:c2:00:00:0e,dl_type=0x88cc,actions=CONTROLLER:65535"
+sh sudo ovs-ofctl -O OpenFlow13 add-flow s2 "table=0,priority=65535,dl_dst=01:80:c2:00:00:0e,dl_type=0x88cc,actions=CONTROLLER:65535"
+sh sudo ovs-ofctl -O OpenFlow13 add-flow s3 "table=0,priority=65535,dl_dst=01:80:c2:00:00:0e,dl_type=0x88cc,actions=CONTROLLER:65535"
+sh sudo ovs-ofctl -O OpenFlow13 add-flow s4 "table=0,priority=65535,dl_dst=01:80:c2:00:00:0e,dl_type=0x88cc,actions=CONTROLLER:65535"
+
+# Port map:
+# s1-eth1 = h1
+# s1-eth2 = s2 slow branch
+# s1-eth3 = s3 fast branch
+# s2-eth1 = s1
+# s2-eth2 = s4
+# s3-eth1 = s1
+# s3-eth2 = s4
+# s4-eth1 = h2
+# s4-eth2 = s2 slow branch
+# s4-eth3 = s3 fast branch
+
+# Default active baseline: slow branch h1 -> s1 -> s2 -> s4 -> h2
 sh sudo ovs-ofctl -O OpenFlow13 add-flow s1 "table=0,priority=100,in_port=1,actions=output:2"
+sh sudo ovs-ofctl -O OpenFlow13 add-flow s2 "table=0,priority=100,in_port=1,actions=output:2"
+sh sudo ovs-ofctl -O OpenFlow13 add-flow s4 "table=0,priority=100,in_port=2,actions=output:1"
+
+# Default active baseline return: h2 -> s4 -> s2 -> s1 -> h1
+sh sudo ovs-ofctl -O OpenFlow13 add-flow s4 "table=0,priority=100,in_port=1,actions=output:2"
+sh sudo ovs-ofctl -O OpenFlow13 add-flow s2 "table=0,priority=100,in_port=2,actions=output:1"
 sh sudo ovs-ofctl -O OpenFlow13 add-flow s1 "table=0,priority=100,in_port=2,actions=output:1"
 
-sh sudo ovs-ofctl -O OpenFlow13 add-flow s2 "table=0,priority=100,in_port=1,actions=output:2"
-sh sudo ovs-ofctl -O OpenFlow13 add-flow s2 "table=0,priority=100,in_port=2,actions=output:1"
+# Fast branch support: s1 -> s3 -> s4 -> h2
+sh sudo ovs-ofctl -O OpenFlow13 add-flow s3 "table=0,priority=100,in_port=1,actions=output:2"
+sh sudo ovs-ofctl -O OpenFlow13 add-flow s4 "table=0,priority=100,in_port=3,actions=output:1"
 
-sh sudo ovs-ofctl -O OpenFlow13 add-flow s4 "table=0,priority=100,in_port=2,actions=output:1"
-sh sudo ovs-ofctl -O OpenFlow13 add-flow s4 "table=0,priority=100,in_port=1,actions=output:2"
+# Fast branch return support: s4 -> s3 -> s1 -> h1
+sh sudo ovs-ofctl -O OpenFlow13 add-flow s3 "table=0,priority=100,in_port=2,actions=output:1"
+sh sudo ovs-ofctl -O OpenFlow13 add-flow s1 "table=0,priority=100,in_port=3,actions=output:1"
 
-pingall
+# Send anything else to controller
+sh sudo ovs-ofctl -O OpenFlow13 add-flow s1 "table=0,priority=0,actions=CONTROLLER:65535"
+sh sudo ovs-ofctl -O OpenFlow13 add-flow s2 "table=0,priority=0,actions=CONTROLLER:65535"
+sh sudo ovs-ofctl -O OpenFlow13 add-flow s3 "table=0,priority=0,actions=CONTROLLER:65535"
+sh sudo ovs-ofctl -O OpenFlow13 add-flow s4 "table=0,priority=0,actions=CONTROLLER:65535"
