@@ -41,7 +41,7 @@ mcp = FastMCP("TopologyTalk")
 # -----------------------------------------------------------------------------
 
 def _log_tool_call(tool_name: str, params: Any):
-    print(f"[TOOL_CALL] {tool_name} with params: {params}")
+    print(f"[TOOL_CALL] {tool_name} with params: {json.dumps(params)}")
 
 def _json(data: Any) -> str:
     return json.dumps(data, indent=2, sort_keys=False)
