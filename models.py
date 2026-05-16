@@ -1,44 +1,30 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from __future__ import annotations
+from typing import Any, Dict, List, Optional
+from pydantic import BaseModel
 
-class QueueConfig(BaseModel):
-    max_rate: Optional[int] = Field(None, description="Maximum rate for the queue in bps")
-    min_rate: Optional[int] = Field(None, description="Minimum rate for the queue in bps")
-
-class SetQueueRequest(BaseModel):
-    switch_id: str = Field(..., description="The DPID of the switch or 'all'")
-    port_name: Optional[str] = Field(None, description="Name of the port (e.g., 's1-eth1'). If omitted, all ports are targets.")
-    type: str = Field("linux-htb", description="Queue type: 'linux-htb' or other supported types")
-    max_rate: Optional[int] = Field(None, description="Maximum rate for the port in bps")
-    queues: List[QueueConfig] = Field(..., description="List of queue configurations")
-
-class QoSRuleMatch(BaseModel):
+class FlowMatch(BaseModel):
     in_port: Optional[int] = None
-    dl_src: Optional[str] = None
-    dl_dst: Optional[str] = None
-    dl_type: Optional[str] = None
-    nw_src: Optional[str] = None
-    nw_dst: Optional[str] = None
-    ipv6_src: Optional[str] = None
-    ipv6_dst: Optional[str] = None
-    nw_proto: Optional[str] = None
-    tp_src: Optional[int] = None
-    tp_dst: Optional[int] = None
-    ip_dscp: Optional[int] = None
+    eth_type: Optional[int] = None
+    ipv4_src: Optional[str] = None
+    ipv4_dst: Optional[str] = None
+    ip_proto: Optional[int] = None
+    tcp_src: Optional[int] = None
+    tcp_dst: Optional[int] = None
+    udp_src: Optional[int] = None
+    udp_dst: Optional[int] = None
 
-class QoSRuleActions(BaseModel):
-    mark: Optional[int] = Field(None, description="DSCP value to mark")
-    meter: Optional[int] = Field(None, description="Meter ID to apply")
-    queue: Optional[int] = Field(None, description="Queue ID to use")
+class ForwardingFlowRequest(BaseModel):
+    switch_id: str
+    match: FlowMatch
+    out_port: int
+    priority: int = 100
 
-class AddQoSRuleRequest(BaseModel):
-    switch_id: str = Field(..., description="The DPID of the switch or 'all'")
-    vlan_id: Optional[str] = Field(None, description="VLAN ID or 'all'")
-    priority: int = Field(1, ge=0, le=65533, description="Priority of the rule (0-65533)")
-    match: QoSRuleMatch = Field(..., description="Match criteria for the rule")
-    actions: QoSRuleActions = Field(..., description="Actions to apply")
+class DeleteFlowRequest(BaseModel):
+    switch_id: str
+    flow_id: Optional[int] = None
+    match: Optional[FlowMatch] = None
 
-class DeleteQoSRuleRequest(BaseModel):
-    switch_id: str = Field(..., description="The DPID of the switch or 'all'")
-    vlan_id: Optional[str] = Field(None, description="VLAN ID or 'all'")
-    qos_id: str = Field(..., description="QoS ID to delete or 'all'")
+class ValidationResult(BaseModel):
+    is_safe: bool
+    reason: str
+    suggested_action: Optional[str] = None

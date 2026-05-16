@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext
-from typing import Optional, List
+from typing import Optional, List, Any, Union
 import os
 from dotenv import load_dotenv
 
@@ -16,33 +16,24 @@ def get_agent():
     if not api_key:
         return None
     
-    # This agent will act as the cross-check layer
     return Agent(
         'openai:gpt-4o',
         result_type=ValidationResult,
         system_prompt=(
-            "You are an SDN QoS Safety Validator. Your job is to inspect proposed QoS changes "
+            "You are an SDN Safety Validator. Your job is to inspect proposed OpenFlow changes "
             "and ensure they are within safe bounds and match the user's intent. "
             "Safe bounds: \n"
-            "- max_rate should not exceed 1Gbps (1000000000 bps)\n"
-            "- priority should be between 0 and 65533\n"
-            "- Do not allow actions that would likely blackhole traffic unless explicitly confirmed."
+            "- Only allow basic forwarding actions (OUTPUT).\n"
+            "- Do not allow arbitrary actions like SET_FIELD.\n"
+            "- Match fields must be restricted to: in_port, eth_src, eth_dst, ipv4_src, ipv4_dst, eth_type.\n"
+            "- Priority should be between 0 and 65535."
         ),
     )
 
-async def validate_qos_action(intent: str, proposed_action: dict) -> ValidationResult:
+async def validate_sdn_request(intent: str, request: Any) -> ValidationResult:
     """
-    Validates a QoS action against the user's intent.
+    Validates an SDN request against the user's intent using PydanticAI.
     """
-    # Fallback to simple rule-based validation if no API key
-    max_rate = proposed_action.get("max_rate")
-    if max_rate and isinstance(max_rate, int) and max_rate > 1000000000:
-        return ValidationResult(
-            is_safe=False,
-            reason="Max rate exceeds 1Gbps safety limit (Rule-based fallback)",
-            suggested_action="Set max_rate to 1000000000 or less"
-        )
-    
     agent = get_agent()
     if not agent:
         return ValidationResult(
@@ -50,7 +41,7 @@ async def validate_qos_action(intent: str, proposed_action: dict) -> ValidationR
             reason="Validated by rule-based fallback (No API key found)"
         )
 
-    prompt = f"User Intent: {intent}\nProposed Action: {proposed_action}"
+    prompt = f"User Intent: {intent}\nProposed Request: {request.model_dump_json() if hasattr(request, 'model_dump_json') else str(request)}"
     
     try:
         result = await agent.run(prompt)
