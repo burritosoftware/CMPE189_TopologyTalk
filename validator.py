@@ -1,3 +1,15 @@
+"""
+LLM-assisted safety gate for SDN write operations.
+
+Flow:
+  1. my_server builds a Pydantic request object (e.g. ForwardingFlowRequest).
+  2. validate_sdn_request sends intent + JSON to a small PydanticAI agent (OpenAI) when OPENAI_API_KEY is set.
+  3. The agent returns ValidationResult: approve or reject with human-readable reason.
+
+If no API key is configured, we fail open with a rule-based "safe" result so local demos still work;
+production deployments should set the key so the model actually reviews each change.
+"""
+
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext
 from typing import Optional, List, Any, Union
@@ -7,6 +19,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class ValidationResult(BaseModel):
+    """Structured decision returned to my_server.install_forwarding_flow."""
     is_safe: bool = Field(..., description="Whether the requested action is safe to perform")
     reason: str = Field(..., description="Reasoning for the safety decision")
     suggested_action: Optional[str] = Field(None, description="A safer alternative if the original was unsafe")
@@ -16,6 +29,7 @@ def get_agent():
     if not api_key:
         return None
     
+    # result_type forces the model output into our ValidationResult schema.
     return Agent(
         'openai:gpt-4o',
         result_type=ValidationResult,
@@ -33,6 +47,9 @@ def get_agent():
 async def validate_sdn_request(intent: str, request: Any) -> ValidationResult:
     """
     Validates an SDN request against the user's intent using PydanticAI.
+
+    When the agent is unavailable, returns is_safe=True so development is not blocked;
+    when the agent errors (network, quota, etc.), returns is_safe=False to avoid silent unsafe writes.
     """
     agent = get_agent()
     if not agent:
